@@ -62,17 +62,6 @@ subjects:
     name: datadog-agent
     namespace: officenafiap
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: datadog-secret
-  namespace: officenafiap
-  labels:
-    app: datadog-agent
-type: Opaque
-stringData:
-  api-key: '1c99d614674776eae044e4618e015aca'
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:

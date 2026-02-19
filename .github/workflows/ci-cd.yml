@@ -61,6 +61,18 @@ jobs:
             kubectl wait --for=condition=Available -n cert-manager deployment/cert-manager-webhook --timeout=300s
           fi
 
+      - name: Sync Datadog secret
+        env:
+          KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+          DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+        run: |
+          : "${DATADOG_API_KEY:?Missing GitHub secret DATADOG_API_KEY}"
+          kubectl create namespace officenafiap --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic datadog-secret \
+            --namespace officenafiap \
+            --from-literal=api-key="$DATADOG_API_KEY" \
+            --dry-run=client -o yaml | kubectl apply --validate=false --request-timeout=30s -f -
+
       - name: Apply Kubernetes manifests
         env:
           KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
@@ -78,6 +90,7 @@ jobs:
           kubectl apply --validate=false --request-timeout=30s -f /tmp/cluster-issuer.yaml
           kubectl apply -n "$NS" --validate=false --request-timeout=30s -f k8s/rabbitmq.yaml
           kubectl apply -n "$NS" --validate=false --request-timeout=30s -f k8s/ingress.yaml
+          kubectl apply --validate=false --request-timeout=30s -f k8s/datadog-agent.yaml
 
       - name: Verify RabbitMQ rollout
         env:
