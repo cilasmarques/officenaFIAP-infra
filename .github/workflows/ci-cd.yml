@@ -1,0 +1,53 @@
+name: infra-ci-cd
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy-rabbitmq:
+    runs-on: officena-fiap-runner
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "latest"
+
+      - name: Verify kubectl access
+        run: kubectl get nodes
+
+      - name: Ensure Kubernetes namespace
+        env:
+          KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+        run: |
+          NS="${KUBE_NAMESPACE:-default}"
+          kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
+
+      - name: Apply Kubernetes manifests
+        env:
+          KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+        run: |
+          NS="${KUBE_NAMESPACE:-default}"
+          kubectl apply -n "$NS" --validate=false --request-timeout=30s -f k8s/rabbitmq.yaml
+
+      - name: Verify RabbitMQ rollout
+        env:
+          KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+        run: |
+          NS="${KUBE_NAMESPACE:-default}"
+          kubectl rollout status -n "$NS" deployment/rabbitmq --timeout=300s || {
+            echo "RabbitMQ rollout failed. Collecting diagnostics..."
+            kubectl get deployment -n "$NS" rabbitmq -o wide || true
+            kubectl describe deployment -n "$NS" rabbitmq || true
+            kubectl get pods -n "$NS" -l app=rabbitmq -o wide || true
+            kubectl describe pods -n "$NS" -l app=rabbitmq || true
+            kubectl logs -n "$NS" -l app=rabbitmq --all-containers=true --tail=200 || true
+            kubectl get events -n "$NS" --sort-by=.lastTimestamp | tail -n 100 || true
+            exit 1
+          }
