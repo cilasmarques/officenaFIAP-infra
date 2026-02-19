@@ -29,6 +29,22 @@ jobs:
           NS="${KUBE_NAMESPACE:-default}"
           kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
 
+      - name: Ensure cert-manager CRDs
+        env:
+          CERT_MANAGER_VERSION: ${{ vars.CERT_MANAGER_VERSION }}
+        run: |
+          CM_VERSION="${CERT_MANAGER_VERSION:-v1.14.7}"
+
+          if kubectl get crd clusterissuers.cert-manager.io >/dev/null 2>&1; then
+            echo "cert-manager CRDs ja existentes."
+          else
+            echo "cert-manager nao encontrado. Instalando ${CM_VERSION}..."
+            kubectl apply --validate=false -f "https://github.com/cert-manager/cert-manager/releases/download/${CM_VERSION}/cert-manager.yaml"
+            kubectl wait --for=condition=Available -n cert-manager deployment/cert-manager --timeout=300s
+            kubectl wait --for=condition=Available -n cert-manager deployment/cert-manager-cainjector --timeout=300s
+            kubectl wait --for=condition=Available -n cert-manager deployment/cert-manager-webhook --timeout=300s
+          fi
+
       - name: Apply Kubernetes manifests
         env:
           KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
