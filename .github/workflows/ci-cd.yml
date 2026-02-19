@@ -32,9 +32,20 @@ jobs:
       - name: Apply Kubernetes manifests
         env:
           KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE }}
+          LETSENCRYPT_EMAIL: ${{ vars.LETSENCRYPT_EMAIL }}
         run: |
           NS="${KUBE_NAMESPACE:-default}"
+
+          if [ -z "${LETSENCRYPT_EMAIL}" ]; then
+            echo "LETSENCRYPT_EMAIL nao definido em GitHub Variables."
+            exit 1
+          fi
+
+          sed "s|__LETSENCRYPT_EMAIL__|${LETSENCRYPT_EMAIL}|g" k8s/cluster-issuer.yaml > /tmp/cluster-issuer.yaml
+
+          kubectl apply --validate=false --request-timeout=30s -f /tmp/cluster-issuer.yaml
           kubectl apply -n "$NS" --validate=false --request-timeout=30s -f k8s/rabbitmq.yaml
+          kubectl apply -n "$NS" --validate=false --request-timeout=30s -f k8s/ingress.yaml
 
       - name: Verify RabbitMQ rollout
         env:
