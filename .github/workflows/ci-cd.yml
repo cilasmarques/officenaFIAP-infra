@@ -29,6 +29,22 @@ jobs:
           NS="${KUBE_NAMESPACE:-default}"
           kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS"
 
+      - name: Ensure ingress-nginx controller
+        env:
+          INGRESS_NGINX_VERSION: ${{ vars.INGRESS_NGINX_VERSION }}
+        run: |
+          INGRESS_VERSION="${INGRESS_NGINX_VERSION:-controller-v1.11.3}"
+          INGRESS_MANIFEST_URL="https://raw.githubusercontent.com/kubernetes/ingress-nginx/${INGRESS_VERSION}/deploy/static/provider/cloud/deploy.yaml"
+
+          if kubectl get deployment -n ingress-nginx ingress-nginx-controller >/dev/null 2>&1; then
+            echo "ingress-nginx controller ja existente."
+          else
+            echo "ingress-nginx nao encontrado. Instalando ${INGRESS_VERSION}..."
+            kubectl apply --validate=false -f "${INGRESS_MANIFEST_URL}"
+          fi
+
+          kubectl wait --for=condition=Available -n ingress-nginx deployment/ingress-nginx-controller --timeout=300s
+
       - name: Ensure cert-manager CRDs
         env:
           CERT_MANAGER_VERSION: ${{ vars.CERT_MANAGER_VERSION }}
