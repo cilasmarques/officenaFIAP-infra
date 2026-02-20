@@ -15,6 +15,13 @@ spec:
     - host: officenafiap.clsmfm.space
       http:
         paths:
+          - path: /v1/payments/webhooks
+            pathType: Prefix
+            backend:
+              service:
+                name: billing-service
+                port:
+                  number: 5003
           - path: /
             pathType: Prefix
             backend:
